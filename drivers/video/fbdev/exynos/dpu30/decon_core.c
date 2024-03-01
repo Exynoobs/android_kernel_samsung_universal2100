@@ -4174,6 +4174,7 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 	struct dpp_ch_restriction dpp_ch_restriction;
 	struct exynos_display_mode display_mode;
 	struct exynos_display_mode *mode;
+	struct decon_reg_data decon_regs;
 	struct vsync_applied_time_data vsync_time;
 
 	int ret = 0;
@@ -4697,6 +4698,37 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 			ret = -EFAULT;
 			break;
 		}
+		break;
+
+	case EXYNOS_SET_DISPLAY_MODE:
+		if (copy_from_user(&display_mode,
+				   (void __user *)arg,
+				   _IOC_SIZE(cmd))) {
+			ret = -EFAULT;
+			break;
+		}
+
+		if (display_mode.index >= lcd_info->display_mode_count) {
+			decon_err("not valid display mode index(%d)\n",
+					display_mode.index);
+			ret = -EINVAL;
+			break;
+		}
+
+		mode = &lcd_info->display_mode[display_mode.index].mode;
+		memcpy(&display_mode, mode, sizeof(display_mode));
+
+		if (!IS_DECON_OFF_STATE(decon)) {
+			memset(&decon_regs, 0, sizeof(struct decon_reg_data));
+
+			decon_regs.mode_update = true;
+			decon_regs.lcd_width = mode->width;
+			decon_regs.lcd_height = mode->height;
+			decon_regs.mode_idx = display_mode.index;
+			decon_regs.vrr_config.fps = mode->fps;
+			decon_regs.vrr_config.mode = DECON_WIN_STATE_VRR_HSMODE;
+			decon_update_fps(decon, &decon_regs);
+			}
 		break;
 
 	case EXYNOS_GET_DISPLAY_CURRENT_MODE:
